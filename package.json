@@ -1,0 +1,19 @@
+{
+  "name": "supabase-data-extractor",
+  "version": "1.0.0",
+  "description": "Independent script to extract data from Supabase using the SDK",
+  "main": "extract-data.js",
+  "type": "module",
+  "scripts": {
+    "extract": "node extract-data.js",
+    "install-deps": "npm install"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.57.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "author": "",
+  "license": "ISC"
+}
