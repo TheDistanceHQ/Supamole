@@ -500,9 +500,9 @@ async function extractTableData(supabase, table, log) {
 async function verifyPublicUrlReachable(url) {
   try {
     const res = await fetch(url, { method: 'GET', redirect: 'follow' });
-    return res.ok;
+    return { ok: res.ok, corsOrNetworkError: false };
   } catch (_) {
-    return false;
+    return { ok: false, corsOrNetworkError: typeof window !== 'undefined' };
   }
 }
 
@@ -578,12 +578,18 @@ async function analyzeStorageBuckets(supabase, log) {
     if (isPublic && objects.length > 0) {
       const sampleForVerify = objects.slice(0, STORAGE_PUBLIC_VERIFY_SAMPLE);
       let verified = 0;
+      let corsOrNetworkError = false;
       for (const obj of sampleForVerify) {
         const { data: urlData } = supabase.storage.from(name).getPublicUrl(obj.path);
-        if (urlData?.publicUrl && (await verifyPublicUrlReachable(urlData.publicUrl))) verified += 1;
+        if (urlData?.publicUrl) {
+          const result = await verifyPublicUrlReachable(urlData.publicUrl);
+          if (result.ok) verified += 1;
+          if (result.corsOrNetworkError) corsOrNetworkError = true;
+        }
       }
-      bucketOut.publicUrlCheck = { verified, sampleSize: sampleForVerify.length };
+      bucketOut.publicUrlCheck = { verified, sampleSize: sampleForVerify.length, corsOrNetworkError: corsOrNetworkError || undefined };
       log(`      Public URL check: ${verified}/${sampleForVerify.length} sample URLs reachable without auth`);
+      if (corsOrNetworkError) log('      ℹ️  Some checks could not be verified (CORS or network).');
       if (verified > 0) log('      ⚠️  Bucket is exposed publicly; content can be accessed by anyone with object paths.');
     }
 
@@ -651,11 +657,12 @@ async function generateSQLSchema(supabase, tables, log) {
  * @returns { Promise<{ discoveryLog: string[], tables: Array<{}>, storage: { buckets: Array<{}> }, auth: { used: boolean, userEmail?: string }, exportSqlPath?: string }> }
  */
 export async function runExtraction(config, options = {}) {
-  const { echoToConsole = true } = options;
+  const { echoToConsole = true, onLog } = options;
   const discoveryLog = [];
   const log = (msg) => {
     discoveryLog.push(msg);
     if (echoToConsole) console.log(msg);
+    if (typeof onLog === 'function') onLog(msg);
   };
 
   const result = {
@@ -705,13 +712,20 @@ export async function runExtraction(config, options = {}) {
   if (config.exportSql) {
     log('\n📝 Generating SQL schema export...');
     const sqlContent = await generateSQLSchema(supabase, tableList, log);
-    try {
-      const fs = await import('fs/promises');
-      await fs.writeFile(config.exportSql, sqlContent, 'utf8');
-      log(`✅ SQL schema exported to: ${config.exportSql}`);
-      result.exportSqlPath = config.exportSql;
-    } catch (error) {
-      log('❌ Error writing SQL file: ' + error.message);
+    const inBrowser = typeof window !== 'undefined';
+    if (inBrowser) {
+      result.exportSqlContent = sqlContent;
+      result.exportSqlFilename = config.exportSql && config.exportSql.trim() ? config.exportSql.trim() : 'schema.sql';
+      log('✅ SQL schema ready for download');
+    } else {
+      try {
+        const fs = await import('fs/promises');
+        await fs.writeFile(config.exportSql, sqlContent, 'utf8');
+        log(`✅ SQL schema exported to: ${config.exportSql}`);
+        result.exportSqlPath = config.exportSql;
+      } catch (error) {
+        log('❌ Error writing SQL file: ' + error.message);
+      }
     }
   }
 

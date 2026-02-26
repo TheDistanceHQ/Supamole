@@ -6,13 +6,16 @@
   "type": "module",
   "scripts": {
     "extract": "node extract-data.js",
-    "start": "node server.js",
-    "serve": "node server.js",
+    "start": "vite",
+    "dev": "vite",
+    "build": "vite build",
     "install-deps": "npm install"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.57.2",
-    "express": "^4.21.0"
+    "@supabase/supabase-js": "^2.57.2"
+  },
+  "devDependencies": {
+    "vite": "^7.3.1"
   },
   "engines": {
     "node": ">=18.0.0"

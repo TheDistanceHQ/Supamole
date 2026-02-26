@@ -30,15 +30,26 @@ node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --token YOUR_BE
 node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --fast-discovery
 ```
 
-### Web interface
-Run the local web app to configure and run scans in the browser, then view analysis, storage scan results, suspected PII with examples, and drill-down (discovery log and full JSON):
+### Web interface (client-only)
+The scan runs entirely in the browser; no server is required.
+
+**Development:** run the Vite dev server (port 3000):
 
 ```bash
 npm install
-npm run start
+npm run dev
 ```
 
-Open `http://localhost:3000`, enter your Supabase URL and anon key (and optional auth), then click **Run scan**. The tool is intended for local or trusted use; credentials are not stored and are used only in memory for each run. CLI usage above still works for automation and CI.
+Open `http://localhost:3000`, enter your Supabase URL and anon key (and optional auth), then click **Run scan**.
+
+**Production:** build then serve the static app with any static file server:
+
+```bash
+npm run build
+npx serve dist
+```
+
+The tool is intended for local or trusted use; credentials are not stored and are used only in memory for each run. CLI usage above still works for automation and CI.
 
 ## Parameters
 
@@ -102,6 +113,7 @@ The script specifically tests for and extracts data from Supabase's auth schema 
 - Indexes objects (root and one level of subfolders) up to a security-scan cap
 - For public buckets, verifies whether sample object URLs are reachable without authentication
 - Results appear in the CLI output and in the web UI under “Storage analysis”
+- In the browser, some public URL checks may report “could not verify (CORS or network)” if the storage host blocks cross-origin requests
 
 ### Authentication & Security
 - Supports anonymous access, email/password authentication, and bearer token authentication

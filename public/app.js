@@ -1,10 +1,18 @@
-(function () {
+export function initApp(runExtraction) {
   const form = document.getElementById('scan-form');
   const formSection = document.getElementById('form-section');
   const loadingSection = document.getElementById('loading-section');
+  const loadingStatus = document.getElementById('loading-status');
   const resultsSection = document.getElementById('results');
   const formError = document.getElementById('form-error');
   const submitBtn = document.getElementById('submit-btn');
+  const exportSqlEl = document.getElementById('exportSql');
+  const exportSqlFilenameWrap = document.getElementById('exportSqlFilename-wrap');
+  if (exportSqlEl && exportSqlFilenameWrap) {
+    exportSqlEl.addEventListener('change', () => {
+      exportSqlFilenameWrap.classList.toggle('hidden', !exportSqlEl.checked);
+    });
+  }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -16,26 +24,25 @@
       formError.classList.remove('hidden');
       return;
     }
-    const body = {
+    const exportSqlEl = document.getElementById('exportSql');
+    const config = {
       url,
       key,
       email: document.getElementById('email').value.trim() || undefined,
-      password: document.getElementById('password').value || undefined,
+      password: document.getElementById('password').value.trim() || undefined,
       token: document.getElementById('token').value.trim() || undefined,
       fastDiscovery: document.getElementById('fastDiscovery').checked,
-      exportSql: undefined,
+      exportSql: exportSqlEl && exportSqlEl.checked ? (document.getElementById('exportSqlFilename')?.value?.trim() || 'schema.sql') : undefined,
     };
     formSection.classList.add('hidden');
     loadingSection.classList.remove('hidden');
+    if (loadingStatus) loadingStatus.textContent = 'Connecting…';
     submitBtn.disabled = true;
     try {
-      const res = await fetch('/api/run', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
+      const data = await runExtraction(config, {
+        echoToConsole: false,
+        onLog: loadingStatus ? (msg) => { loadingStatus.textContent = msg; } : undefined,
       });
-      const data = res.ok ? await res.json() : null;
-      if (!res.ok) throw new Error(data?.error || `Request failed: ${res.status}`);
       renderResults(data);
       resultsSection.classList.remove('hidden');
     } catch (err) {
@@ -71,6 +78,17 @@
 
     const summary = el('div', { className: 'card' }, [
       el('h2', { textContent: 'Summary' }),
+      ...(data.exportSqlContent
+        ? [
+            el('div', { style: 'margin-bottom:0.75rem' }, [
+              el('button', {
+                className: 'btn',
+                textContent: 'Download SQL',
+                id: 'download-sql-btn',
+              }),
+            ]),
+          ]
+        : []),
       el('div', { className: 'summary-stats' }, [
         el('span', { textContent: `Tables: ${tables.length}` }),
         el('span', { textContent: `Tables with suspected PII: ${tablesWithPII.length}` }),
@@ -81,6 +99,20 @@
           : null,
       ].filter(Boolean)),
     ]);
+
+    if (data.exportSqlContent) {
+      const sqlBtn = summary.querySelector('#download-sql-btn');
+      if (sqlBtn) {
+        sqlBtn.addEventListener('click', () => {
+          const blob = new Blob([data.exportSqlContent], { type: 'text/plain;charset=utf-8' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = data.exportSqlFilename || 'schema.sql';
+          a.click();
+          URL.revokeObjectURL(a.href);
+        });
+      }
+    }
 
     const storageCard = el('div', { className: 'card' }, [
       el('h2', { textContent: 'Storage analysis' }),
@@ -96,7 +128,8 @@
         if (b.publicUrlCheck) {
           const warn = el('div', { className: 'storage-warn' });
           warn.textContent = `Public URL check: ${b.publicUrlCheck.verified}/${b.publicUrlCheck.sampleSize} sample URLs reachable without auth.`;
-          if (b.publicUrlCheck.verified > 0) warn.textContent += ' Bucket content may be publicly accessible.';
+          if (b.publicUrlCheck.corsOrNetworkError) warn.textContent += ' (Some checks could not be verified due to CORS or network.)';
+          else if (b.publicUrlCheck.verified > 0) warn.textContent += ' Bucket content may be publicly accessible.';
           div.appendChild(warn);
         }
         if (b.samplePaths && b.samplePaths.length) {
@@ -166,6 +199,9 @@
       el('div', { className: 'tabs' }, [
         el('button', { textContent: 'Discovery log', className: 'active', id: 'tab-log' }),
         el('button', { textContent: 'Full JSON', id: 'tab-json' }),
+        ...(data.exportSqlContent
+          ? [el('button', { className: 'btn', textContent: 'Download SQL', id: 'download-sql-deeper' })]
+          : []),
       ]),
       el('div', { id: 'panel-log' }, [
         el('pre', { textContent: discoveryLog.join('\n') }),
@@ -198,6 +234,24 @@
       a.download = 'scan-result.json';
       a.click();
     });
+    const sqlBtnDeeper = deeperCard.querySelector('#download-sql-deeper');
+    if (sqlBtnDeeper && data.exportSqlContent) {
+      sqlBtnDeeper.addEventListener('click', () => {
+        const blob = new Blob([data.exportSqlContent], { type: 'text/plain;charset=utf-8' });
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = data.exportSqlFilename || 'schema.sql';
+        a.click();
+        URL.revokeObjectURL(a.href);
+      });
+    }
+
+    const newScanBtn = el('button', { className: 'btn', textContent: 'New scan', id: 'new-scan-btn' });
+    newScanBtn.addEventListener('click', () => {
+      resultsSection.classList.add('hidden');
+      formSection.classList.remove('hidden');
+    });
+    const resultsFooter = el('div', { style: 'text-align:center;margin-top:1.5rem;margin-bottom:1rem' }, [newScanBtn]);
 
     resultsSection.innerHTML = '';
     resultsSection.appendChild(summary);
@@ -205,6 +259,7 @@
     resultsSection.appendChild(tablesCard);
     resultsSection.appendChild(piiCard);
     resultsSection.appendChild(deeperCard);
+    resultsSection.appendChild(resultsFooter);
   }
 
   function escapeHtml(s) {
@@ -213,4 +268,4 @@
     div.textContent = s;
     return div.innerHTML;
   }
-})();
+}

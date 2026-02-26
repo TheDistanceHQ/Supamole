@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Supabase GDPR Scanner</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #1c1c1c;
+      --bg-surface: #252525;
+      --bg-surface-2: #2e2e2e;
+      --text: #ededed;
+      --text-muted: #a1a1a1;
+      --brand: #3ECF8E;
+      --brand-hover: #2eb87a;
+      --border: #3d3d3d;
+      --danger: #f87171;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: 'Inter', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.5;
+    }
+    .container { max-width: 900px; margin: 0 auto; padding: 2rem; }
+    .hero {
+      display: flex;
+      align-items: center;
+      gap: 2rem;
+      margin-bottom: 2rem;
+      flex-wrap: wrap;
+    }
+    .hero img { height: 140px; width: auto; object-fit: contain; }
+    .hero-text h1 { font-size: 1.75rem; margin: 0 0 0.5rem; font-weight: 700; }
+    .hero-text p { margin: 0; color: var(--text-muted); font-size: 0.95rem; }
+    .card {
+      background: var(--bg-surface);
+      border: 1px solid var(--brand);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card h2 { font-size: 1.1rem; margin: 0 0 1rem; font-weight: 600; color: var(--text); }
+    label { display: block; margin-bottom: 0.35rem; font-size: 0.875rem; color: var(--text-muted); }
+    input[type="text"], input[type="password"], input[type="url"] {
+      width: 100%;
+      padding: 0.6rem 0.75rem;
+      background: var(--bg-surface-2);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 0.9rem;
+      margin-bottom: 1rem;
+    }
+    input:focus { outline: none; border-color: var(--brand); }
+    .row { display: flex; gap: 1rem; flex-wrap: wrap; }
+    .row > * { flex: 1 1 200px; }
+    .checkbox-wrap { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 1rem; }
+    .checkbox-wrap input { width: auto; margin: 0; }
+    .btn {
+      background: var(--brand);
+      color: #111;
+      border: none;
+      padding: 0.7rem 1.25rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .btn:hover { background: var(--brand-hover); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+    .error { color: var(--danger); margin-top: 0.5rem; font-size: 0.875rem; }
+    .hidden { display: none !important; }
+    #results { margin-top: 2rem; }
+    .summary-stats { display: flex; flex-wrap: wrap; gap: 1rem; margin-bottom: 1rem; }
+    .summary-stats span { background: var(--bg-surface-2); padding: 0.5rem 0.75rem; border-radius: 6px; font-size: 0.875rem; }
+    .accordion-header {
+      display: flex; justify-content: space-between; align-items: center;
+      padding: 0.75rem; background: var(--bg-surface-2); border-radius: 6px;
+      cursor: pointer; margin-bottom: 0.5rem; font-size: 0.9rem;
+    }
+    .accordion-header:hover { background: #363636; }
+    .accordion-body { padding: 0.75rem; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 0.5rem; font-size: 0.85rem; }
+    pre { overflow: auto; max-height: 400px; padding: 1rem; background: #111; border-radius: 6px; font-size: 0.8rem; white-space: pre-wrap; word-break: break-all; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+    th, td { text-align: left; padding: 0.5rem; border-bottom: 1px solid var(--border); }
+    .pii-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; background: rgba(248,113,113,0.2); color: var(--danger); font-size: 0.75rem; margin-right: 0.25rem; }
+    .storage-warn { color: #fbbf24; font-size: 0.875rem; }
+    .tabs { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+    .tabs button { padding: 0.5rem 1rem; background: var(--bg-surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-family: inherit; }
+    .tabs button.active { background: var(--brand); color: #111; border-color: var(--brand); }
+    .note { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .loading-spinner {
+      width: 32px; height: 32px; border: 3px solid var(--border);
+      border-top-color: var(--brand); border-radius: 50%;
+      animation: spin 0.8s linear infinite; margin: 0 auto 1rem; display: block;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #loading-status { font-size: 0.875rem; color: var(--text-muted); min-height: 1.5rem; }
+  </style>
+  <script type="module" src="./main.js"></script>
+</head>
+<body>
+  <div class="container">
+    <header class="hero">
+      <img src="/supamole.png" alt="Supamole" />
+      <div class="hero-text">
+        <h1>Supabase GDPR Scanner</h1>
+        <p>Dig into your Supabase instance for GDPR and data-leak checks.</p>
+      </div>
+    </header>
+
+    <section id="form-section" class="card">
+      <h2>Scan configuration</h2>
+      <form id="scan-form" onsubmit="event.preventDefault(); return false;">
+        <div class="row">
+          <div>
+            <label for="url">Supabase URL *</label>
+            <input type="url" id="url" name="url" placeholder="https://xxxx.supabase.co" required />
+          </div>
+          <div>
+            <label for="key">Anon key *</label>
+            <input type="password" id="key" name="key" placeholder="eyJhbG..." required />
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <label for="email">Email (optional)</label>
+            <input type="text" id="email" name="email" placeholder="user@example.com" />
+          </div>
+          <div>
+            <label for="password">Password (optional)</label>
+            <input type="password" id="password" name="password" placeholder="••••••••" />
+          </div>
+        </div>
+        <div>
+          <label for="token">Bearer token (optional, overrides email/password)</label>
+          <input type="password" id="token" name="token" placeholder="JWT token" />
+          <p class="note">If both token and email/password are set, token is used.</p>
+        </div>
+        <div class="checkbox-wrap">
+          <input type="checkbox" id="fastDiscovery" name="fastDiscovery" />
+          <label for="fastDiscovery">Fast discovery (skip comprehensive table name discovery)</label>
+        </div>
+        <div class="checkbox-wrap">
+          <input type="checkbox" id="exportSql" name="exportSql" />
+          <label for="exportSql">Export SQL schema (include in result and show Download SQL)</label>
+        </div>
+        <div id="exportSqlFilename-wrap" class="hidden">
+          <label for="exportSqlFilename">SQL filename (optional)</label>
+          <input type="text" id="exportSqlFilename" name="exportSqlFilename" placeholder="schema.sql" />
+        </div>
+        <button type="submit" class="btn" id="submit-btn">Run scan</button>
+        <p id="form-error" class="error hidden"></p>
+      </form>
+    </section>
+
+    <section id="loading-section" class="card hidden">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <p id="loading-status">Connecting…</p>
+    </section>
+
+    <section id="results" class="hidden"></section>
+  </div>
+</body>
+</html>
