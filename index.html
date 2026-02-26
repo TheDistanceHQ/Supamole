@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Supabase GDPR Scanner</title>
+  <title>Supamole - Supabase Security Scanner</title>
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
@@ -97,6 +97,13 @@
     .tabs button { padding: 0.5rem 1rem; background: var(--bg-surface-2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); cursor: pointer; font-family: inherit; }
     .tabs button.active { background: var(--brand); color: #111; border-color: var(--brand); }
     .note { font-size: 0.8rem; color: var(--text-muted); margin-top: 0.25rem; }
+    .browser-only-note { font-size: 0.85rem; color: var(--text-muted); margin-top: 0.75rem; max-width: 480px; }
+    .github-link { margin-top: 0.5rem; font-size: 0.9rem; }
+    .github-link a { color: var(--brand); text-decoration: none; }
+    .github-link a:hover { text-decoration: underline; }
+    .footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); text-align: center; font-size: 0.875rem; color: var(--text-muted); }
+    .footer a { color: var(--brand); text-decoration: none; }
+    .footer a:hover { text-decoration: underline; }
     .loading-spinner {
       width: 32px; height: 32px; border: 3px solid var(--border);
       border-top-color: var(--brand); border-radius: 50%;
@@ -104,6 +111,19 @@
     }
     @keyframes spin { to { transform: rotate(360deg); } }
     #loading-status { font-size: 0.875rem; color: var(--text-muted); min-height: 1.5rem; }
+    .results-gate .gate-prompt { color: var(--text-muted); margin-bottom: 1rem; }
+    .gate-options { display: flex; flex-direction: column; gap: 0.75rem; }
+    .gate-option {
+      display: inline-flex; align-items: center; justify-content: center; gap: 0.5rem;
+      padding: 0.75rem 1.25rem; background: var(--bg-surface-2); border: 1px solid var(--border);
+      border-radius: 6px; color: var(--text); text-decoration: none; font-family: inherit;
+      font-size: 0.95rem; cursor: pointer; transition: border-color 0.15s, background 0.15s;
+    }
+    .gate-option:hover { border-color: var(--brand); background: #363636; color: var(--text); }
+    .gate-option-website { flex-direction: column; }
+    .gate-favicon { width: 32px; height: 32px; object-fit: contain; }
+    .gate-icon { width: 1.25rem; height: 1.25rem; flex-shrink: 0; }
+    .gate-option-sad { width: 100%; opacity: 0.85; }
   </style>
   <script type="module" src="./main.js"></script>
 </head>
@@ -112,8 +132,10 @@
     <header class="hero">
       <img src="/supamole.png" alt="Supamole" />
       <div class="hero-text">
-        <h1>Supabase GDPR Scanner</h1>
-        <p>Dig into your Supabase instance for GDPR and data-leak checks.</p>
+        <h1>Supabase Security Scanner</h1>
+        <p>Dig into your Supabase instance for security, GDPR and data-leak checks.</p>
+        <p class="browser-only-note">This tool runs entirely in your browser. There is no backend and no data is captured or stored.</p>
+        <p class="github-link"><a href="https://github.com/TheDistanceHQ/supamole" target="_blank" rel="noopener noreferrer">View source on GitHub</a></p>
       </div>
     </header>
 
@@ -168,6 +190,10 @@
     </section>
 
     <section id="results" class="hidden"></section>
+
+    <footer class="footer">
+      Built by <a href="https://thedistance.co.uk?utm_source=supamole&utm_medium=referral" target="_blank" rel="noopener noreferrer">The Distance</a>
+    </footer>
   </div>
 </body>
 </html>

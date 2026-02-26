@@ -1,3 +1,9 @@
+const GITHUB_REPO_URL = 'https://github.com/TheDistanceHQ/supamole';
+const WEBSITE_URL = 'https://thedistance.co.uk?utm_source=supamole&utm_medium=referral';
+const LOGO_PATH = '/logo.png';
+const FAVICON_PATH = '/the-distance-icon.png';
+const GITHUB_ICON_SVG = '<svg class="gate-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/></svg>';
+
 export function initApp(runExtraction) {
   const form = document.getElementById('scan-form');
   const formSection = document.getElementById('form-section');
@@ -8,10 +14,55 @@ export function initApp(runExtraction) {
   const submitBtn = document.getElementById('submit-btn');
   const exportSqlEl = document.getElementById('exportSql');
   const exportSqlFilenameWrap = document.getElementById('exportSqlFilename-wrap');
+  let pendingResultsData = null;
   if (exportSqlEl && exportSqlFilenameWrap) {
     exportSqlEl.addEventListener('change', () => {
       exportSqlFilenameWrap.classList.toggle('hidden', !exportSqlEl.checked);
     });
+  }
+
+  function showResultsGate() {
+    resultsSection.innerHTML = '';
+    const gate = document.createElement('div');
+    gate.id = 'results-gate';
+    gate.className = 'card results-gate';
+    gate.innerHTML = `
+      <h2>Your scan is ready</h2>
+      <p class="gate-prompt">Choose an option to view your results:</p>
+      <div class="gate-options">
+        <a href="${WEBSITE_URL}" target="_blank" rel="noopener noreferrer" class="gate-option gate-option-website" id="gate-check-us-out">
+          <img src="${FAVICON_PATH}" width="24" height="24" alt="" class="gate-favicon" onerror="this.style.display='none'" />
+          <span>Check us out</span>
+        </a>
+        <a href="${GITHUB_REPO_URL}" target="_blank" rel="noopener noreferrer" class="gate-option gate-option-github" id="gate-rate-github">
+          ${GITHUB_ICON_SVG}
+          <span>Like us on GitHub</span>
+        </a>
+        <button type="button" class="gate-option gate-option-sad" id="gate-just-view">
+          😢 Just view the result 
+        </button>
+      </div>
+    `;
+    resultsSection.appendChild(gate);
+
+    const openAndShow = (url) => {
+      if (url) window.open(url, '_blank', 'noopener,noreferrer');
+      gate.remove();
+      if (pendingResultsData) {
+        renderResults(pendingResultsData);
+        pendingResultsData = null;
+      }
+    };
+
+    gate.querySelector('#gate-check-us-out').addEventListener('click', (e) => {
+      e.preventDefault();
+      openAndShow(WEBSITE_URL);
+    });
+    gate.querySelector('#gate-rate-github').addEventListener('click', (e) => {
+      e.preventDefault();
+      openAndShow(GITHUB_REPO_URL);
+    });
+    gate.querySelector('#gate-just-view').addEventListener('click', () => openAndShow(null));
   }
 
   form.addEventListener('submit', async (e) => {
@@ -43,7 +94,8 @@ export function initApp(runExtraction) {
         echoToConsole: false,
         onLog: loadingStatus ? (msg) => { loadingStatus.textContent = msg; } : undefined,
       });
-      renderResults(data);
+      pendingResultsData = data;
+      showResultsGate();
       resultsSection.classList.remove('hidden');
     } catch (err) {
       formError.textContent = err.message || 'Scan failed';
@@ -78,17 +130,6 @@ export function initApp(runExtraction) {
 
     const summary = el('div', { className: 'card' }, [
       el('h2', { textContent: 'Summary' }),
-      ...(data.exportSqlContent
-        ? [
-            el('div', { style: 'margin-bottom:0.75rem' }, [
-              el('button', {
-                className: 'btn',
-                textContent: 'Download SQL',
-                id: 'download-sql-btn',
-              }),
-            ]),
-          ]
-        : []),
       el('div', { className: 'summary-stats' }, [
         el('span', { textContent: `Tables: ${tables.length}` }),
         el('span', { textContent: `Tables with suspected PII: ${tablesWithPII.length}` }),
@@ -99,20 +140,6 @@ export function initApp(runExtraction) {
           : null,
       ].filter(Boolean)),
     ]);
-
-    if (data.exportSqlContent) {
-      const sqlBtn = summary.querySelector('#download-sql-btn');
-      if (sqlBtn) {
-        sqlBtn.addEventListener('click', () => {
-          const blob = new Blob([data.exportSqlContent], { type: 'text/plain;charset=utf-8' });
-          const a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = data.exportSqlFilename || 'schema.sql';
-          a.click();
-          URL.revokeObjectURL(a.href);
-        });
-      }
-    }
 
     const storageCard = el('div', { className: 'card' }, [
       el('h2', { textContent: 'Storage analysis' }),
