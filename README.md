@@ -1,4 +1,4 @@
-# Supamole — Supabase Security Scanner
+# SupaMole — Supabase Security Scanner
 
 <img src="public/social.png" alt="Supamole" width="50%" />
 
