@@ -1065,6 +1065,112 @@ async function checkConnection(supabase) {
   }
 }
 
+/** Max objects to index per bucket (security scan cap) */
+const STORAGE_INDEX_LIMIT = 2000;
+/** Sample size for public URL access verification */
+const STORAGE_PUBLIC_VERIFY_SAMPLE = 5;
+
+/**
+ * Verify that a public URL is actually reachable without authentication.
+ */
+async function verifyPublicUrlReachable(url) {
+  try {
+    const res = await fetch(url, { method: 'GET', redirect: 'follow' });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Analyse Supabase Storage buckets for security: list buckets, detect public exposure,
+ * and attempt to index object listing (content) that might be present.
+ */
+async function analyzeStorageBuckets(supabase) {
+  console.log('\n🪣 Storage bucket security analysis...');
+
+  const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
+  if (bucketsError) {
+    console.log('   ⚠️  Could not list storage buckets:', bucketsError.message);
+    return;
+  }
+  if (!buckets || buckets.length === 0) {
+    console.log('   ℹ️  No storage buckets found (or no permission to list buckets).');
+    return;
+  }
+
+  console.log(`   Found ${buckets.length} bucket(s).`);
+
+  for (const bucket of buckets) {
+    const name = bucket.name || bucket.id;
+    const isPublic = bucket.public === true;
+    console.log(`\n   📦 Bucket: ${name}`);
+    console.log(`      Public (config): ${isPublic ? 'YES ⚠️' : 'No'}`);
+    if (bucket.file_size_limit != null) {
+      console.log(`      File size limit: ${bucket.file_size_limit}`);
+    }
+
+    let objects = [];
+    const { data: listData, error: listError } = await supabase.storage.from(name).list('', { limit: 500, sortBy: { column: 'name', order: 'asc' } });
+    if (listError) {
+      console.log(`      List objects: ❌ ${listError.message}`);
+    } else if (listData && listData.length > 0) {
+      objects = listData.map(e => ({ path: e.name, name: e.name, size: e.metadata?.size }));
+      let offset = 500;
+      while (objects.length < STORAGE_INDEX_LIMIT) {
+        const { data: next, error: nextErr } = await supabase.storage.from(name).list('', { limit: 200, offset, sortBy: { column: 'name', order: 'asc' } });
+        if (nextErr || !next || next.length === 0) break;
+        for (const e of next) objects.push({ path: e.name, name: e.name, size: e.metadata?.size });
+        offset += next.length;
+        if (next.length < 200) break;
+      }
+      // Index one level of subfolders (likely folder prefixes) to improve content visibility
+      const possibleFolders = objects.filter(o => !o.path.includes('.') && o.path.length > 0);
+      for (const folder of possibleFolders.slice(0, 30)) {
+        if (objects.length >= STORAGE_INDEX_LIMIT) break;
+        const { data: subList } = await supabase.storage.from(name).list(folder.path, { limit: 100, sortBy: { column: 'name', order: 'asc' } });
+        if (subList && subList.length > 0) {
+          for (const e of subList) {
+            if (objects.length >= STORAGE_INDEX_LIMIT) break;
+            const subPath = `${folder.path}/${e.name}`;
+            objects.push({ path: subPath, name: e.name, size: e.metadata?.size });
+          }
+        }
+      }
+      console.log(`      Indexed objects: ${objects.length}`);
+      if (objects.length > 0) {
+        const sample = objects.slice(0, 10);
+        console.log('      Sample paths:');
+        sample.forEach(o => console.log(`         - ${o.path}${o.size != null ? ` (${o.size} bytes)` : ''}`));
+        if (objects.length > 10) {
+          console.log(`         ... and ${objects.length - 10} more`);
+        }
+      }
+    } else {
+      console.log('      Indexed objects: 0 (empty or no list permission).');
+    }
+
+    if (isPublic && objects.length > 0) {
+      const sampleForVerify = objects.slice(0, STORAGE_PUBLIC_VERIFY_SAMPLE);
+      let verified = 0;
+      for (const obj of sampleForVerify) {
+        const { data: urlData } = supabase.storage.from(name).getPublicUrl(obj.path);
+        const url = urlData?.publicUrl;
+        if (url) {
+          const reachable = await verifyPublicUrlReachable(url);
+          if (reachable) verified += 1;
+        }
+      }
+      console.log(`      Public URL check: ${verified}/${sampleForVerify.length} sample URLs reachable without auth`);
+      if (verified > 0) {
+        console.log('      ⚠️  Bucket is exposed publicly; content can be accessed by anyone with object paths.');
+      }
+    }
+  }
+
+  console.log('\n   Storage bucket analysis completed.');
+}
+
 /**
  * Main execution function
  */
@@ -1155,7 +1261,10 @@ async function main() {
   }
 
   console.log('\n✨ Data extraction completed!');
-  
+
+  // Storage bucket security analysis: public exposure and content indexing
+  await analyzeStorageBuckets(supabase);
+
   // Sign out if we authenticated
   if (authResult) {
     await supabase.auth.signOut();
