@@ -1,5 +1,7 @@
 # Supamole — Supabase Security Scanner
 
+<img src="public/supamole.png" alt="Supamole" width="50%" />
+
 An independent script and web app that uses the Supabase SDK to discover and extract data from all available objects in a Supabase instance. The web UI (Supamole) runs entirely in the browser for security, GDPR and data-leak checks.
 
 ## Project structure
