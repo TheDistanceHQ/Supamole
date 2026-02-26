@@ -1,6 +1,14 @@
-# Supabase Data Extractor
+# Supamole — Supabase Security Scanner
 
-An independent script that uses the Supabase SDK to discover and extract data from all available objects in a Supabase instance.
+An independent script and web app that uses the Supabase SDK to discover and extract data from all available objects in a Supabase instance. The web UI (Supamole) runs entirely in the browser for security, GDPR and data-leak checks.
+
+## Project structure
+
+- **CLI:** `extract-data.js` — Node script for automation/CI.
+- **Web app (Supamole):** Vite-built static site:
+  - `index.html` — Single-page app shell and styles.
+  - `public/` — Entry `main.js`, app logic `app.js`, assets (logo, favicon, etc.).
+- **Build:** `npm run dev` (Vite dev server), `npm run build` (output in `dist/`).
 
 ## Installation
 
@@ -10,46 +18,50 @@ npm install
 
 ## Usage
 
-### Basic usage (anonymous access)
-```bash
-node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY
-```
+### Web interface (Supamole)
 
-### With email/password authentication
-```bash
-node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --email your@email.com --password yourpassword
-```
+The scan runs entirely in the browser; no server is required and credentials are not stored.
 
-### With bearer token authentication
-```bash
-node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --token YOUR_BEARER_TOKEN
-```
-
-### Fast discovery mode (recommended for large databases)
-```bash
-node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --fast-discovery
-```
-
-### Web interface (client-only)
-The scan runs entirely in the browser; no server is required.
-
-**Development:** run the Vite dev server (port 3000):
+**Development:**
 
 ```bash
-npm install
 npm run dev
 ```
 
-Open `http://localhost:3000`, enter your Supabase URL and anon key (and optional auth), then click **Run scan**.
+Open the URL shown (e.g. `http://localhost:5173`), enter your Supabase URL and anon key (and optional auth), then run the scan.
 
-**Production:** build then serve the static app with any static file server:
+**Production:**
 
 ```bash
 npm run build
 npx serve dist
 ```
 
-The tool is intended for local or trusted use; credentials are not stored and are used only in memory for each run. CLI usage above still works for automation and CI.
+Serve the `dist/` folder with any static file server.
+
+### CLI (anonymous access)
+
+```bash
+node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY
+```
+
+### CLI with email/password authentication
+
+```bash
+node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --email your@email.com --password yourpassword
+```
+
+### CLI with bearer token
+
+```bash
+node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --token YOUR_BEARER_TOKEN
+```
+
+### Fast discovery (recommended for large databases)
+
+```bash
+node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --fast-discovery
+```
 
 ## Parameters
 
@@ -57,66 +69,60 @@ The tool is intended for local or trusted use; credentials are not stored and ar
 - `--key` (required): Your Supabase anon key
 - `--email` (optional): Email for authentication
 - `--password` (optional): Password for authentication
-- `--token` (optional): Bearer token for authentication (JWT token from Supabase Auth)
+- `--token` (optional): Bearer token (JWT from Supabase Auth); overrides email/password if both are set
 - `--fast-discovery` (optional): Skip comprehensive table name discovery for faster execution
 
 ## Features
 
-### Advanced Table Discovery
-The script uses 8 different methods to discover tables across multiple schemas:
+### Advanced table discovery
 
-1. **information_schema.tables** - Standard SQL schema information (public and auth schemas)
-2. **pg_tables** - PostgreSQL system catalog (public and auth schemas)
-3. **RPC functions** - Custom stored procedures (if available)
-4. **information_schema.views** - Database views (public and auth schemas)
-5. **Auth schema tables** - Direct testing of known Supabase auth tables (auth.users, auth.sessions, etc.)
-6. **REST API introspection** - OpenAPI specification analysis
-7. **GraphQL introspection** - Discovers types/tables exposed via the GraphQL endpoint
-8. **Common name discovery** - Tests 70+ common table names (can be skipped with --fast-discovery)
+The script uses multiple methods to discover tables across schemas:
 
-### GraphQL Schema Discovery
-The script performs GraphQL introspection to discover additional tables/types that are specifically queryable through the GraphQL API:
+- **information_schema.tables** / **pg_tables** — Public and auth schemas
+- **RPC functions** — Custom stored procedures (if available)
+- **information_schema.views** — Database views
+- **Auth schema tables** — Known Supabase auth tables (auth.users, auth.sessions, etc.)
+- **REST API introspection** — OpenAPI analysis
+- **GraphQL introspection** — Types/tables via GraphQL endpoint
+- **Common name discovery** — Tests many common table names (skippable with `--fast-discovery`)
 
-- Queries the `/graphql/v1` endpoint with introspection
-- Analyzes the Query type to find all queryable fields and their return types
-- Unwraps LIST and NON_NULL wrappers to identify actual object types
-- Excludes scalar types, system types, and pagination types (Connection, Edge, PageInfo)
-- Only includes types that are actually exposed as queries (not just mutations or subscriptions)
-- Converts PascalCase GraphQL types to snake_case table names
-- Attempts data extraction using both converted names and original GraphQL type names
-- Provides comprehensive analysis of Query fields and queryable object types
+### GraphQL schema discovery
 
-### Auth Schema Support
-The script specifically tests for and extracts data from Supabase's auth schema tables including:
-- `auth.users` - User accounts (with sensitive data masking)
-- `auth.sessions` - User sessions
-- `auth.identities` - Social login identities
-- `auth.refresh_tokens` - Refresh tokens
-- `auth.audit_log_entries` - Authentication audit logs
-- And 10+ other auth-related tables
+- Introspects `/graphql/v1`, analyzes Query type and queryable object types
+- Converts PascalCase types to snake_case for extraction
+- Excludes scalars and pagination types
 
-### Data Extraction
-- Lists all discovered tables and views with their types
-- Shows detailed column information (name, data type, nullable status)
-- Extracts all data with accurate row counts
-- Displays sample data (first 3 rows) for readability
-- Includes built-in rate limiting to avoid overwhelming the API
-- Handles errors gracefully for inaccessible objects
+### Auth schema support
+
+Tests and extracts (with sensitive masking where appropriate) from auth tables such as `auth.users`, `auth.sessions`, `auth.identities`, `auth.refresh_tokens`, `auth.audit_log_entries`, and others.
+
+### Data extraction
+
+- Lists discovered tables/views with types, column info, row counts
+- Sample data (e.g. first rows), rate limiting, and error handling
 
 ### PII detection (GDPR)
-- Scans each table’s columns and sample values for **suspected PII**: name, date of birth, age, address, telephone
-- Uses column-name hints and optional value-format checks; reports findings with example values for GDPR review
-- In the web UI, “Tables with suspected PII” lists affected tables and columns with examples
+
+- Scans columns and sample values for suspected PII (name, DoB, address, phone, etc.)
+- Reports findings with examples for GDPR review; in the web UI, “Tables with suspected PII” summarizes these.
 
 ### Storage scan
-- Lists Supabase Storage buckets and their configuration (public/private, file size limit)
-- Indexes objects (root and one level of subfolders) up to a security-scan cap
-- For public buckets, verifies whether sample object URLs are reachable without authentication
-- Results appear in the CLI output and in the web UI under “Storage analysis”
-- In the browser, some public URL checks may report “could not verify (CORS or network)” if the storage host blocks cross-origin requests
 
-### Authentication & Security
-- Supports anonymous access, email/password authentication, and bearer token authentication
-- Bearer token authentication takes precedence if both token and email/password are provided
-- Automatic session management and cleanup
-- Secure credential handling (no storage of credentials; in the web app, credentials are only in memory for the single run)
+- Lists Storage buckets and config (public/private, file size limit)
+- Indexes objects (root and one level of subfolders) up to a cap
+- For public buckets, checks whether sample object URLs are reachable without auth
+- Results in CLI output and web UI under “Storage analysis”
+
+### Authentication & security
+
+- Anonymous, email/password, and bearer token auth
+- Bearer token takes precedence when both token and email/password are provided
+- No persistent storage of credentials; in the web app they are used only in memory for the run.
+
+## License
+
+This project is licensed under **CC BY-NC-SA 4.0** (Creative Commons Attribution-NonCommercial-ShareAlike 4.0). You may use, share, and adapt it for non-commercial purposes with attribution; derivatives must use the same license. See [LICENSE](LICENSE) and the [full legal code](https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode).
+
+## Credit
+
+Created by [The Distance](https://thedistance.co.uk?utm_source=supamole&utm_medium=referral). Source: [TheDistanceHQ/supamole](https://github.com/TheDistanceHQ/supamole).
