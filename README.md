@@ -30,6 +30,16 @@ node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --token YOUR_BE
 node extract-data.js --url YOUR_SUPABASE_URL --key YOUR_ANON_KEY --fast-discovery
 ```
 
+### Web interface
+Run the local web app to configure and run scans in the browser, then view analysis, storage scan results, suspected PII with examples, and drill-down (discovery log and full JSON):
+
+```bash
+npm install
+npm run start
+```
+
+Open `http://localhost:3000`, enter your Supabase URL and anon key (and optional auth), then click **Run scan**. The tool is intended for local or trusted use; credentials are not stored and are used only in memory for each run. CLI usage above still works for automation and CI.
+
 ## Parameters
 
 - `--url` (required): Your Supabase project URL
@@ -82,8 +92,19 @@ The script specifically tests for and extracts data from Supabase's auth schema 
 - Includes built-in rate limiting to avoid overwhelming the API
 - Handles errors gracefully for inaccessible objects
 
+### PII detection (GDPR)
+- Scans each table’s columns and sample values for **suspected PII**: name, date of birth, age, address, telephone
+- Uses column-name hints and optional value-format checks; reports findings with example values for GDPR review
+- In the web UI, “Tables with suspected PII” lists affected tables and columns with examples
+
+### Storage scan
+- Lists Supabase Storage buckets and their configuration (public/private, file size limit)
+- Indexes objects (root and one level of subfolders) up to a security-scan cap
+- For public buckets, verifies whether sample object URLs are reachable without authentication
+- Results appear in the CLI output and in the web UI under “Storage analysis”
+
 ### Authentication & Security
 - Supports anonymous access, email/password authentication, and bearer token authentication
 - Bearer token authentication takes precedence if both token and email/password are provided
 - Automatic session management and cleanup
-- Secure credential handling (no storage of credentials)
+- Secure credential handling (no storage of credentials; in the web app, credentials are only in memory for the single run)
