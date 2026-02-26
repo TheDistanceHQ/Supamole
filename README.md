@@ -1,13 +1,13 @@
 # SupaMole — Supabase Security Scanner
 
-<img src="public/social.png" alt="Supamole" width="50%" />
+<img src="public/social.png" alt="SupaMole" width="50%" />
 
-An independent script and web app that uses the Supabase SDK to discover and extract data from all available objects in a Supabase instance. The web UI (Supamole) runs entirely in the browser for security, GDPR and data-leak checks.
+An independent script and web app that uses the Supabase SDK to discover and extract data from all available objects in a Supabase instance. The web UI (SupaMole) runs entirely in the browser for security, GDPR and data-leak checks.
 
 ## Project structure
 
 - **CLI:** `extract-data.js` — Node script for automation/CI.
-- **Web app (Supamole):** Vite-built static site:
+- **Web app (SupaMole):** Vite-built static site:
   - `index.html` — Single-page app shell and styles.
   - `public/` — Entry `main.js`, app logic `app.js`, assets (logo, favicon, etc.).
 - **Build:** `npm run dev` (Vite dev server), `npm run build` (output in `dist/`).
@@ -20,7 +20,7 @@ npm install
 
 ## Usage
 
-### Web interface (Supamole)
+### Web interface (SupaMole)
 
 The scan runs entirely in the browser; no server is required and credentials are not stored.
 
