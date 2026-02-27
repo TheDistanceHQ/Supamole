@@ -56,17 +56,31 @@ export function initApp(runExtraction) {
 
     gate.querySelector('#gate-check-us-out').addEventListener('click', (e) => {
       e.preventDefault();
+      if (typeof gtag === 'function') {
+        gtag('event', 'results_gate_click', { gate_option: 'check_us_out' });
+      }
       openAndShow(WEBSITE_URL);
     });
     gate.querySelector('#gate-rate-github').addEventListener('click', (e) => {
       e.preventDefault();
+      if (typeof gtag === 'function') {
+        gtag('event', 'results_gate_click', { gate_option: 'like_github' });
+      }
       openAndShow(GITHUB_REPO_URL);
     });
-    gate.querySelector('#gate-just-view').addEventListener('click', () => openAndShow(null));
+    gate.querySelector('#gate-just-view').addEventListener('click', () => {
+      if (typeof gtag === 'function') {
+        gtag('event', 'results_gate_click', { gate_option: 'just_view' });
+      }
+      openAndShow(null);
+    });
   }
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (typeof gtag === 'function') {
+      gtag('event', 'scan_start');
+    }
     formError.classList.add('hidden');
     const url = document.getElementById('url').value.trim();
     const key = document.getElementById('key').value.trim();
