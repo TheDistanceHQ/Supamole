@@ -105,27 +105,49 @@ async function discoverAuthTables(supabase, log) {
   return discoveredTables;
 }
 
-async function discoverViaRestAPI(supabase) {
+async function discoverViaRestAPI(supabase, log) {
   const discoveredTables = [];
   try {
     const restUrl = `${supabase.supabaseUrl}/rest/v1/`;
-    const response = await fetch(restUrl, {
-      headers: {
-        apikey: supabase.supabaseKey,
-        Authorization: `Bearer ${supabase.supabaseKey}`,
-        Accept: 'application/openapi+json',
-      },
-    });
-    if (response.ok) {
-      const openApiSpec = await response.json();
-      if (openApiSpec.paths) {
-        const tablePaths = Object.keys(openApiSpec.paths)
-          .filter((path) => path.startsWith('/') && !path.includes('{'))
-          .map((path) => path.substring(1))
-          .filter((name) => name && !name.includes('/'));
-        tablePaths.forEach((tableName) => {
-          discoveredTables.push({ table_name: tableName, table_schema: 'public', table_type: 'BASE TABLE' });
-        });
+    const baseHeaders = {
+      apikey: supabase.supabaseKey,
+      Authorization: `Bearer ${supabase.supabaseKey}`,
+      Accept: 'application/openapi+json',
+    };
+
+    // Probe with an invalid schema name to get the PGRST106 error which lists all exposed schemas
+    let exposedSchemas = ['public'];
+    try {
+      const probeRes = await fetch(restUrl, {
+        headers: { ...baseHeaders, 'Accept-Profile': '__probe__' },
+      });
+      if (!probeRes.ok) {
+        const errorBody = await probeRes.json().catch(() => null);
+        if (errorBody?.hint) {
+          const match = errorBody.hint.match(/Only the following schemas are exposed: (.+)/);
+          if (match) {
+            exposedSchemas = match[1].split(',').map((s) => s.trim()).filter(Boolean);
+            if (log) log(`   ℹ️  REST API exposes schemas: ${exposedSchemas.join(', ')}`);
+          }
+        }
+      }
+    } catch (_) {}
+
+    for (const schema of exposedSchemas) {
+      const schemaHeaders = { ...baseHeaders };
+      if (schema !== 'public') schemaHeaders['Accept-Profile'] = schema;
+      const response = await fetch(restUrl, { headers: schemaHeaders });
+      if (response.ok) {
+        const openApiSpec = await response.json();
+        if (openApiSpec.paths) {
+          const tablePaths = Object.keys(openApiSpec.paths)
+            .filter((path) => path.startsWith('/') && !path.includes('{'))
+            .map((path) => path.substring(1))
+            .filter((name) => name && !name.includes('/'));
+          tablePaths.forEach((tableName) => {
+            discoveredTables.push({ table_name: tableName, table_schema: schema, table_type: 'BASE TABLE' });
+          });
+        }
       }
     }
   } catch (_) {}
@@ -348,7 +370,7 @@ async function getSchemaInfo(supabase, fastDiscovery, log) {
 
   try {
     log('   🔍 Method 5: Trying REST API introspection...');
-    const apiTables = await discoverViaRestAPI(supabase);
+    const apiTables = await discoverViaRestAPI(supabase, log);
     if (apiTables?.length > 0) {
       log(`   ✅ Found ${apiTables.length} tables via REST API`);
       discoveredTables = [...discoveredTables, ...apiTables];
@@ -379,7 +401,7 @@ async function getSchemaInfo(supabase, fastDiscovery, log) {
   }
 
   const uniqueTables = discoveredTables.filter(
-    (table, index, self) => index === self.findIndex((t) => t.table_name === table.table_name)
+    (table, index, self) => index === self.findIndex((t) => t.table_name === table.table_name && t.table_schema === table.table_schema)
   );
   log(`   📊 Total unique tables/views discovered: ${uniqueTables.length}`);
   return uniqueTables;
@@ -402,10 +424,12 @@ async function getTableColumns(supabase, tableName, tableSchema, log) {
     log(`     ⚠️  information_schema.columns failed: ${error.message}`);
   }
   try {
-    const tableRef = tableSchema === 'public' ? tableName : `${tableSchema}.${tableName}`;
-    const { data, error } = await supabase.from(tableRef).select('*').limit(0);
+    const isCustomSchema = tableSchema !== 'public' && tableSchema !== 'auth';
+    const schemaClient = isCustomSchema ? supabase.schema(tableSchema) : supabase;
+    const tableRef = isCustomSchema ? tableName : (tableSchema === 'public' ? tableName : `${tableSchema}.${tableName}`);
+    const { data, error } = await schemaClient.from(tableRef).select('*').limit(0);
     if (!error) {
-      const { data: sampleData, error: sampleError } = await supabase.from(tableRef).select('*').limit(1);
+      const { data: sampleData, error: sampleError } = await schemaClient.from(tableRef).select('*').limit(1);
       if (!sampleError && sampleData?.length > 0) {
         log(`     ✅ Inferred ${Object.keys(sampleData[0]).length} columns from sample data`);
         return Object.keys(sampleData[0]).map((colName) => ({
@@ -459,8 +483,10 @@ async function extractTableData(supabase, table, log) {
       }
     }
 
-    let tableRef = tableSchema === 'public' ? tableName : fullTableName;
-    let { data, error, count } = await supabase.from(tableRef).select('*', { count: 'exact' });
+    const isCustomSchema = tableSchema !== 'public' && tableSchema !== 'auth';
+    const schemaClient = isCustomSchema ? supabase.schema(tableSchema) : supabase;
+    let tableRef = isCustomSchema ? tableName : (tableSchema === 'public' ? tableName : fullTableName);
+    let { data, error, count } = await schemaClient.from(tableRef).select('*', { count: 'exact' });
     if (error && table.graphql_type) {
       log(`   🔄 Trying GraphQL type name: ${table.graphql_type}`);
       const graphqlResult = await supabase.from(table.graphql_type).select('*', { count: 'exact' });
